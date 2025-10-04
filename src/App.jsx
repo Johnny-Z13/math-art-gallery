@@ -174,7 +174,7 @@ const MathArtGallery = () => {
   const [scale, setScale] = useState(0.38);
   const [param1, setParam1] = useState(1);
   const [param2, setParam2] = useState(Math.PI);
-  const [canvasSize, setCanvasSize] = useState(400);
+  const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [particleMode, setParticleMode] = useState(false);
   const [isPlaying, setIsPlaying] = useState(true);
@@ -217,6 +217,24 @@ const MathArtGallery = () => {
   const lastFpsUpdate = useRef(Date.now());
   const lastFrameTime = useRef(0);
   const theta = useRef(0);
+
+  // Animation parameter refs (for real-time updates without restarting)
+  const speedRef = useRef(speed);
+  const scaleRef = useRef(scale);
+  const param1Ref = useRef(param1);
+  const param2Ref = useRef(param2);
+  const trailLengthRef = useRef(trailLength);
+  const colorModeRef = useRef(colorMode);
+
+  // Update refs when state changes
+  useEffect(() => {
+    speedRef.current = speed;
+    scaleRef.current = scale;
+    param1Ref.current = param1;
+    param2Ref.current = param2;
+    trailLengthRef.current = trailLength;
+    colorModeRef.current = colorMode;
+  }, [speed, scale, param1, param2, trailLength, colorMode]);
 
   const formula = FORMULAS[selectedFormula];
 
@@ -402,24 +420,23 @@ const MathArtGallery = () => {
 
   useEffect(() => {
     const updateSize = () => {
-      const width = window.innerWidth;
-      const height = window.innerHeight;
-      if (isFullscreen) {
-        const size = Math.min(width, height);
-        setCanvasSize(size);
-      } else {
-        // Canvas-centric sizing for new layout
-        const availableWidth = width - 384; // 192px sidebars * 2
-        const availableHeight = height - 160; // header + bottom
-        const size = Math.min(availableWidth, availableHeight, 600);
-        setCanvasSize(Math.max(size, 300));
-      }
+      const windowWidth = window.innerWidth;
+      const windowHeight = window.innerHeight;
+
+      // Always use the same size - fullscreen is just a CSS overlay
+      const availableWidth = windowWidth - 400; // Left (192) + Right (192) + padding
+      const availableHeight = windowHeight - 180; // Header + bottom controls + padding
+
+      setCanvasSize({
+        width: Math.max(availableWidth, 600),
+        height: Math.max(availableHeight, 400)
+      });
     };
 
     updateSize();
     window.addEventListener('resize', updateSize);
     return () => window.removeEventListener('resize', updateSize);
-  }, [isFullscreen]);
+  }, []);
 
   useEffect(() => {
     const params = FORMULAS[selectedFormula].defaultParams;
@@ -474,14 +491,14 @@ const MathArtGallery = () => {
           event.preventDefault();
           const presetIndex = parseInt(event.key) - 1;
           if (presetIndex < PRESETS.length) {
-            applyPreset(PRESETS[presetIndex]);
+            loadPreset(PRESETS[presetIndex]);
           }
           break;
         case 'r':
           event.preventDefault();
           // Random preset
           const randomPreset = PRESETS[Math.floor(Math.random() * PRESETS.length)];
-          applyPreset(randomPreset);
+          loadPreset(randomPreset);
           break;
         case 'escape':
           event.preventDefault();
@@ -503,21 +520,34 @@ const MathArtGallery = () => {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isPlaying, particleMode, isFullscreen, showHelp]);
 
+  // Separate effect to handle canvas resizing without restarting animation
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    // Resize canvas (this will clear it, but animation continues)
+    canvas.width = canvasSize.width;
+    canvas.height = canvasSize.height;
+
+    // Fill with background color so it's not transparent
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = 'rgb(10, 10, 20)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }, [canvasSize]);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const ctx = canvas.getContext('2d');
-    canvas.width = canvasSize;
-    canvas.height = canvasSize;
-    const width = canvasSize;
-    const height = canvasSize;
-
     const points = [];
-    const actualScale = scale * canvasSize;
 
     const animate = (timestamp) => {
       const frameStart = performance.now();
+
+      // Get current canvas dimensions dynamically
+      const width = canvas.width;
+      const height = canvas.height;
 
       if (!isPlaying) {
         lastFrameTime.current = timestamp;
@@ -544,11 +574,16 @@ const MathArtGallery = () => {
       ctx.fillStyle = 'rgba(10, 10, 20, 0.05)';
       ctx.fillRect(0, 0, width, height);
 
-      // Update theta based on speed and delta time
-      theta.current += speed * deltaTime;
+      // Update theta based on speed and delta time (use ref for real-time updates)
+      theta.current += speedRef.current * deltaTime;
       const t = theta.current;
 
-      const { x, y } = calculatePoint(t, selectedFormula, width, height, actualScale, param1, param2, chaosState.current);
+      // Get current values from refs for real-time updates
+      const actualScale = scaleRef.current * Math.min(width, height);
+      const currentParam1 = param1Ref.current;
+      const currentParam2 = param2Ref.current;
+
+      const { x, y } = calculatePoint(t, selectedFormula, width, height, actualScale, currentParam1, currentParam2, chaosState.current);
 
       // Particle effects with object pooling
       if (particleMode) {
@@ -565,9 +600,9 @@ const MathArtGallery = () => {
             particle.life = 1.0;
             particle.decay = 0.01 + Math.random() * 0.02;
             particle.size = 1 + Math.random() * 3;
-            particle.hue = colorMode === 'rainbow' ? (t * 50) % 360 :
-                          colorMode === 'cyan-pink' ? 180 + Math.sin(t) * 120 :
-                          colorMode === 'fire' ? 30 - Math.cos(t) * 30 : 200;
+            particle.hue = colorModeRef.current === 'rainbow' ? (t * 50) % 360 :
+                          colorModeRef.current === 'cyan-pink' ? 180 + Math.sin(t) * 120 :
+                          colorModeRef.current === 'fire' ? 30 - Math.cos(t) * 30 : 200;
             particles.current.push(particle);
           }
         }
@@ -600,7 +635,7 @@ const MathArtGallery = () => {
       }
 
       points.push({ x, y, t });
-      if (points.length > trailLength) {
+      if (points.length > trailLengthRef.current) {
         points.shift();
       }
 
@@ -610,13 +645,13 @@ const MathArtGallery = () => {
         const alpha = i / points.length;
 
         let color;
-        if (colorMode === 'rainbow') {
+        if (colorModeRef.current === 'rainbow') {
           const hue = (p2.t * 50) % 360;
           color = `hsla(${hue}, 80%, 60%, ${alpha})`;
-        } else if (colorMode === 'cyan-pink') {
+        } else if (colorModeRef.current === 'cyan-pink') {
           const hue = 180 + Math.sin(p2.t) * 120;
           color = `hsla(${hue}, 80%, 60%, ${alpha})`;
-        } else if (colorMode === 'fire') {
+        } else if (colorModeRef.current === 'fire') {
           const hue = 30 - Math.cos(p2.t) * 30;
           color = `hsla(${hue}, 100%, 60%, ${alpha})`;
         } else {
@@ -633,7 +668,7 @@ const MathArtGallery = () => {
       }
 
       // Enhanced main point with glow effect
-      const mainColor = colorMode === 'rainbow'
+      const mainColor = colorModeRef.current === 'rainbow'
         ? `hsl(${(t * 50) % 360}, 100%, 70%)`
         : '#00ffff';
 
@@ -655,17 +690,18 @@ const MathArtGallery = () => {
       animationRef.current = requestAnimationFrame(animate);
     };
 
+    // Initial canvas clear
     ctx.fillStyle = 'rgb(10, 10, 20)';
-    ctx.fillRect(0, 0, width, height);
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    animate();
+    animationRef.current = requestAnimationFrame(animate);
 
     return () => {
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [speed, trailLength, colorMode, scale, param1, param2, selectedFormula, canvasSize, particleMode, isPlaying]);
+  }, [selectedFormula, particleMode, isPlaying]);
 
   const getParam1Label = () => {
     switch(selectedFormula) {
@@ -735,8 +771,9 @@ const MathArtGallery = () => {
       clifford: { x: 0, y: 0 }
     };
 
-    // Reset theta
+    // Reset animation timing
     theta.current = 0;
+    lastFrameTime.current = 0;
 
     // Apply preset parameters
     setSelectedFormula(preset.formula);
@@ -803,9 +840,9 @@ const MathArtGallery = () => {
 
   const exportSVG = () => {
     try {
-      const width = canvasSize;
-      const height = canvasSize;
-      const actualScale = scale * canvasSize;
+      const width = canvasSize.width;
+      const height = canvasSize.height;
+      const actualScale = scale * Math.min(width, height);
 
       const points = [];
       let t = 0;
@@ -904,15 +941,25 @@ const MathArtGallery = () => {
 
   return (
     <div className="fixed inset-0 bg-[var(--bg-primary)] overflow-hidden">
-      {isFullscreen ? (
-        <div
-          className="fixed inset-0 bg-black flex items-center justify-center z-50"
-          onClick={() => setIsFullscreen(false)}
-        >
-          <canvas ref={canvasRef} className="touch-none" style={{ width: `${canvasSize}px`, height: `${canvasSize}px` }} />
-        </div>
-      ) : (
-        <div className="h-full flex flex-col">
+      {/* Fullscreen backdrop with exit button */}
+      {isFullscreen && (
+        <>
+          <div
+            className="fixed inset-0 bg-black z-40"
+            onClick={() => setIsFullscreen(false)}
+          />
+          <button
+            onClick={() => setIsFullscreen(false)}
+            className="fixed top-4 right-4 z-50 glass hover:bg-[var(--accent-primary)] hover:bg-opacity-20 text-[var(--text-primary)] p-2 rounded-lg btn-hover group transition-all duration-300"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="group-hover:stroke-[var(--accent-primary)]">
+              <path d="M18 6L6 18M6 6l12 12"/>
+            </svg>
+          </button>
+        </>
+      )}
+
+      <div className="h-full flex flex-col" style={{ position: 'relative', zIndex: isFullscreen ? 50 : 1 }}>
           {/* Header */}
           <div className="flex-shrink-0 px-6 py-3 glass border-b border-[var(--border-subtle)]">
             <div className="flex items-center justify-between mb-2">
@@ -1022,20 +1069,37 @@ const MathArtGallery = () => {
             </div>
 
             {/* Canvas Center */}
-            <div className="flex-1 flex items-center justify-center relative bg-[var(--bg-secondary)]">
+            <div
+              className={`flex-1 flex items-center justify-center relative ${isFullscreen ? '' : 'bg-[var(--bg-secondary)]'}`}
+              style={{
+                position: isFullscreen ? 'fixed' : 'relative',
+                inset: isFullscreen ? 0 : 'auto',
+                zIndex: isFullscreen ? 50 : 1,
+                background: isFullscreen ? 'black' : undefined
+              }}
+            >
               <canvas
                 ref={canvasRef}
-                className="border border-[var(--border-emphasis)] rounded-xl touch-none shadow-2xl"
-                style={{ width: `${canvasSize}px`, height: `${canvasSize}px` }}
+                className={`touch-none ${isFullscreen ? '' : 'border border-[var(--border-emphasis)] rounded-xl shadow-2xl'}`}
+                style={{
+                  display: 'block',
+                  width: isFullscreen ? '90vw' : `${canvasSize.width}px`,
+                  height: isFullscreen ? '90vh' : `${canvasSize.height}px`,
+                  maxWidth: '100%',
+                  maxHeight: '100%',
+                  objectFit: 'contain'
+                }}
               />
-              <button
-                onClick={() => setIsFullscreen(true)}
-                className="absolute top-4 right-4 glass hover:bg-[var(--accent-primary)] hover:bg-opacity-20 text-[var(--text-primary)] p-2 rounded-lg btn-hover group transition-all duration-300"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="group-hover:stroke-[var(--accent-primary)]">
-                  <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a 2 2 0 0 0-2-2h-3m0 18h3a 2 2 0 0 0 2-2v-3M3 16v3a 2 2 0 0 0 2 2h3"/>
-                </svg>
-              </button>
+              {!isFullscreen && (
+                <button
+                  onClick={() => setIsFullscreen(true)}
+                  className="absolute top-4 right-4 glass hover:bg-[var(--accent-primary)] hover:bg-opacity-20 text-[var(--text-primary)] p-2 rounded-lg btn-hover group transition-all duration-300"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="group-hover:stroke-[var(--accent-primary)]">
+                    <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a 2 2 0 0 0-2-2h-3m0 18h3a 2 2 0 0 0 2-2v-3M3 16v3a 2 2 0 0 0 2 2h3"/>
+                  </svg>
+                </button>
+              )}
             </div>
 
             {/* Right Sidebar */}
