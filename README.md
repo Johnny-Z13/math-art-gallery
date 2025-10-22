@@ -2,7 +2,7 @@
 
 An interactive web application that generates stunning mathematical art using parametric curves, chaos theory, and fractals. Create, customize, and export beautiful visualizations in real-time.
 
-![Version](https://img.shields.io/badge/version-0.4.0-blue)
+![Version](https://img.shields.io/badge/version-1.0.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 ## ✨ Features
@@ -126,5 +126,4 @@ This is a personal learning project, but suggestions and feedback are welcome!
 
 ---
 
-**Version**: 0.4.0 (Pre-release)
-**Next Milestone**: v1.0.0 (First stable release)
+**Version**: 1.0.0 - First Stable Release!

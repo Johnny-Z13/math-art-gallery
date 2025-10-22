@@ -1,6 +1,6 @@
 {
   "name": "math-art-gallery",
-  "version": "0.4.0",
+  "version": "1.0.0",
   "type": "module",
   "description": "Interactive mathematical art generator with parametric curves, chaos systems, and fractals",
   "main": "src/index.jsx",
