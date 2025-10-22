@@ -2,21 +2,22 @@
 
 An interactive web application that generates stunning mathematical art using parametric curves, chaos theory, and fractals. Create, customize, and export beautiful visualizations in real-time.
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue)
+![Version](https://img.shields.io/badge/version-1.1.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 ## ✨ Features
 
-### Mathematical Formulas (14 total)
+### Mathematical Formulas (15 total)
 - **Classic Curves**: Euler's Identity, Lissajous, Rose, Spirograph, Harmonograph
 - **Cycloids**: Epicycloid, Hypocycloid, Cardioid
 - **Chaos Systems**: Lorenz Attractor, Hénon Map, Clifford Attractor
 - **Fractals**: Mandelbrot Trace, Julia Set
 - **Special Curves**: Butterfly Curve
+- **Physics**: Wave Interference (multi-wave superposition)
 
 ### Customization
 - 🎨 **4 Color Modes**: Rainbow, Neon (Cyan-Pink), Fire, Blue
-- 🎯 **15 Curated Presets**: Hand-crafted beautiful patterns
+- 🎯 **18 Curated Presets**: Hand-crafted beautiful patterns
 - ⚙️ **Real-time Controls**: Speed, scale, trail length, formula parameters
 - ✨ **Particle Effects**: Optional particle system with physics
 - 📊 **Performance Monitor**: FPS, render time, point count tracking
@@ -126,4 +127,10 @@ This is a personal learning project, but suggestions and feedback are welcome!
 
 ---
 
-**Version**: 1.0.0 - First Stable Release!
+**Version**: 1.1.0 - Wave Interference Update
+
+**What's New in v1.1.0:**
+- 🌊 New Formula: Wave Interference (multi-wave superposition)
+- ✨ 3 New Presets: Wave Interference, Quantum Ripples, Holographic Field
+- 📐 Physics-based visualization of constructive/destructive interference
+- 🎛️ Control wave frequency (k-value) and wave count (2-32 waves)
