@@ -147,6 +147,50 @@ input[type="range"]::-moz-range-thumb:hover {
   box-shadow: 0 3px 10px rgba(0, 212, 255, 0.5);
 }
 
+/* Keyboard focus indicators for accessibility */
+button:focus-visible,
+select:focus-visible,
+input[type="range"]:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(0, 212, 255, 0.15);
+}
+
+/* Focus indicators for range sliders */
+input[type="range"]:focus-visible::-webkit-slider-thumb {
+  ring: 2px solid var(--accent-primary);
+  box-shadow: 0 0 0 4px rgba(0, 212, 255, 0.3), 0 2px 6px rgba(0, 212, 255, 0.5);
+}
+
+input[type="range"]:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 4px rgba(0, 212, 255, 0.3), 0 2px 6px rgba(0, 212, 255, 0.5);
+}
+
+/* Canvas focus state */
+canvas:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 4px;
+}
+
+/* Skip to main content link for keyboard navigation */
+.skip-to-main {
+  position: absolute;
+  left: -9999px;
+  z-index: 999;
+  padding: 1em;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  text-decoration: none;
+  border: 2px solid var(--accent-primary);
+  border-radius: 8px;
+}
+
+.skip-to-main:focus {
+  left: 50%;
+  top: 1em;
+  transform: translateX(-50%);
+}
+
 /* Mobile optimizations */
 @media (max-width: 768px) {
   .glass {

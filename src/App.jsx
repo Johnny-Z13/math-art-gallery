@@ -1,5 +1,18 @@
 import React, { useEffect, useRef, useState } from 'react';
 
+// Mathematical constants for formula calculations
+const LORENZ_TIME_STEP = 0.01;
+const LORENZ_BETA = 8 / 3;
+const HARMONOGRAPH_DECAY = 0.05;
+const SPIROGRAPH_DISTANCE_RATIO = 0.7;
+const CLIFFORD_C = -1.0;
+const CLIFFORD_D = 0.75;
+const MANDELBROT_ESCAPE_RADIUS_SQUARED = 4;
+
+// Performance and rendering constants
+const PARTICLE_POOL_MAX_SIZE = 1000;
+const TRAIL_MAX_LENGTH = 1000;
+
 const PRESETS = [
   {
     name: "🌀 Golden Spiral",
@@ -207,7 +220,7 @@ const MathArtGallery = () => {
   };
 
   const recycleParticle = (particle) => {
-    if (particlePool.current.length < 1000) {
+    if (particlePool.current.length < PARTICLE_POOL_MAX_SIZE) {
       particlePool.current.push(particle);
     }
   };
@@ -249,6 +262,11 @@ const MathArtGallery = () => {
     let x, y;
 
     switch(formulaType) {
+      // Euler's Identity - Sum of complex exponentials
+      // Formula: z(θ) = e^(iθ) + e^(πiθ) represented as z = cos(θ) + i·sin(θ)
+      // Discovered by Leonhard Euler (1707-1783)
+      // Reference: https://en.wikipedia.org/wiki/Euler%27s_formula
+      // p1: not used, p2: frequency multiplier for second exponential (default π)
       case 'euler':
         const z1_real = Math.cos(theta);
         const z1_imag = Math.sin(theta);
@@ -258,17 +276,32 @@ const MathArtGallery = () => {
         y = canvasHeight / 2 + (z1_imag + z2_imag) * actualScale;
         break;
 
+      // Lissajous Curves - Parametric curves representing harmonic motion
+      // Formula: x = A·sin(aθ + δ), y = B·sin(bθ)
+      // Discovered by Jules Antoine Lissajous (1857)
+      // Reference: https://en.wikipedia.org/wiki/Lissajous_curve
+      // p1: frequency ratio a, p2: frequency ratio b
       case 'lissajous':
         x = canvasWidth / 2 + actualScale * Math.sin(p1 * theta);
         y = canvasHeight / 2 + actualScale * Math.sin(p2 * theta);
         break;
 
+      // Rose Curve - Sinusoidal curve in polar coordinates
+      // Formula: r = cos(k·θ) where k determines number of petals
+      // Described by Guido Grandi (1723)
+      // Reference: https://en.wikipedia.org/wiki/Rose_(mathematics)
+      // p1: petal count k (odd k = k petals, even k = 2k petals), p2: not used
       case 'rose':
         const r_rose = Math.cos(p1 * theta);
         x = canvasWidth / 2 + actualScale * r_rose * Math.cos(theta);
         y = canvasHeight / 2 + actualScale * r_rose * Math.sin(theta);
         break;
 
+      // Epicycloid - Curve traced by a point on a circle rolling outside another circle
+      // Formula: x = (R+r)cos(θ) - r·cos((R/r + 1)θ), y = (R+r)sin(θ) - r·sin((R/r + 1)θ)
+      // Studied extensively in ancient Greek mathematics
+      // Reference: https://en.wikipedia.org/wiki/Epicycloid
+      // p1: radius R of fixed circle, p2: radius r of rolling circle
       case 'epicycloid':
         const R_epi = p1;
         const r_epi = p2;
@@ -277,6 +310,11 @@ const MathArtGallery = () => {
         y = canvasHeight / 2 + actualScale * ((R_epi + r_epi) * Math.sin(theta) - r_epi * Math.sin((ratio_epi + 1) * theta));
         break;
 
+      // Hypocycloid - Curve traced by a point on a circle rolling inside another circle
+      // Formula: x = (R-r)cos(θ) + r·cos((R/r - 1)θ), y = (R-r)sin(θ) - r·sin((R/r - 1)θ)
+      // Special case: R/r = 4 produces a straight line (deltoid)
+      // Reference: https://en.wikipedia.org/wiki/Hypocycloid
+      // p1: radius R of fixed circle, p2: radius r of rolling circle
       case 'hypocycloid':
         const R_hypo = p1;
         const r_hypo = p2;
@@ -285,44 +323,64 @@ const MathArtGallery = () => {
         y = canvasHeight / 2 + actualScale * ((R_hypo - r_hypo) * Math.sin(theta) - r_hypo * Math.sin((ratio_hypo - 1) * theta));
         break;
 
+      // Harmonograph - Simulates a mechanical drawing device with damped pendulums
+      // Formula: x = sin(p1·θ)·e^(-decay·θ), y = sin(p2·θ + π/4)·e^(-decay·θ)
+      // Physical harmonographs were popular Victorian-era drawing toys
+      // Reference: https://en.wikipedia.org/wiki/Harmonograph
+      // p1: x-axis frequency, p2: y-axis frequency, decay rate defined by HARMONOGRAPH_DECAY
       case 'harmonograph':
-        const decay = 0.05;
-        const damping = Math.exp(-decay * theta);
+        const damping = Math.exp(-HARMONOGRAPH_DECAY * theta);
         x = canvasWidth / 2 + actualScale * Math.sin(p1 * theta) * damping;
         y = canvasHeight / 2 + actualScale * Math.sin(p2 * theta + Math.PI / 4) * damping;
         break;
 
+      // Butterfly Curve - Transcendental plane curve
+      // Formula: r = e^(sin θ) - 2cos(4θ) + sin^5(θ/12)
+      // Discovered by Temple H. Fay
+      // Reference: https://en.wikipedia.org/wiki/Butterfly_curve_(transcendental)
+      // p1: scale multiplier, p2: not used
       case 'butterfly':
         const r_butterfly = Math.exp(Math.sin(theta)) - 2 * Math.cos(4 * theta) + Math.pow(Math.sin(theta / 12), 5);
         x = canvasWidth / 2 + actualScale * r_butterfly * Math.cos(theta) * p1;
         y = canvasHeight / 2 + actualScale * r_butterfly * Math.sin(theta) * p1;
         break;
 
+      // Spirograph - Mathematical roulette curve (hypotrochoid)
+      // Formula: x = (R-r)cos(θ) + d·r·cos((R-r)/r·θ), y = (R-r)sin(θ) - d·r·sin((R-r)/r·θ)
+      // Popularized by the Spirograph toy (Denys Fisher, 1965)
+      // Reference: https://en.wikipedia.org/wiki/Spirograph
+      // p1: outer radius R, p2: inner radius r, d defined by SPIROGRAPH_DISTANCE_RATIO
       case 'spirograph':
         const R_spiro = p1;
         const r_spiro = p2;
-        const d = 0.7;
-        x = canvasWidth / 2 + actualScale * ((R_spiro - r_spiro) * Math.cos(theta) + d * r_spiro * Math.cos((R_spiro - r_spiro) / r_spiro * theta));
-        y = canvasHeight / 2 + actualScale * ((R_spiro - r_spiro) * Math.sin(theta) - d * r_spiro * Math.sin((R_spiro - r_spiro) / r_spiro * theta));
+        x = canvasWidth / 2 + actualScale * ((R_spiro - r_spiro) * Math.cos(theta) + SPIROGRAPH_DISTANCE_RATIO * r_spiro * Math.cos((R_spiro - r_spiro) / r_spiro * theta));
+        y = canvasHeight / 2 + actualScale * ((R_spiro - r_spiro) * Math.sin(theta) - SPIROGRAPH_DISTANCE_RATIO * r_spiro * Math.sin((R_spiro - r_spiro) / r_spiro * theta));
         break;
 
+      // Cardioid - Heart-shaped curve (special case of limaçon)
+      // Formula: r = a(1 + cos θ) in polar coordinates
+      // Name from Greek "kardia" (heart) + "eidos" (shape)
+      // Reference: https://en.wikipedia.org/wiki/Cardioid
+      // p1: scale parameter a, p2: not used
       case 'cardioid':
         const r_card = p1 * (1 + Math.cos(theta)) * 2;
         x = canvasWidth / 2 + actualScale * r_card * Math.cos(theta);
         y = canvasHeight / 2 + actualScale * r_card * Math.sin(theta);
         break;
 
+      // Lorenz Strange Attractor - Chaotic system exhibiting butterfly effect
+      // Differential equations: dx/dt = σ(y-x), dy/dt = x(ρ-z)-y, dz/dt = xy-βz
+      // Discovered by Edward Lorenz (1963) while studying atmospheric convection
+      // Reference: https://en.wikipedia.org/wiki/Lorenz_system
+      // p1: σ (sigma, Prandtl number), p2: ρ (rho, Rayleigh number), β and dt from constants
       case 'lorenz':
-        // Lorenz Strange Attractor
         const sigma = p1;
         const rho = p2;
-        const beta = 8/3;
-        const dt = 0.01;
 
         const state = chaosStateRef.lorenz;
-        const dx = sigma * (state.y - state.x) * dt;
-        const dy = (state.x * (rho - state.z) - state.y) * dt;
-        const dz = (state.x * state.y - beta * state.z) * dt;
+        const dx = sigma * (state.y - state.x) * LORENZ_TIME_STEP;
+        const dy = (state.x * (rho - state.z) - state.y) * LORENZ_TIME_STEP;
+        const dz = (state.x * state.y - LORENZ_BETA * state.z) * LORENZ_TIME_STEP;
 
         state.x += dx;
         state.y += dy;
@@ -332,8 +390,12 @@ const MathArtGallery = () => {
         y = canvasHeight / 2 + actualScale * state.y * 10;
         break;
 
+      // Hénon Map - Discrete-time chaotic dynamical system
+      // Formula: x(n+1) = 1 - a·x(n)² + y(n), y(n+1) = b·x(n)
+      // Introduced by Michel Hénon (1976) as simplified Poincaré map
+      // Reference: https://en.wikipedia.org/wiki/H%C3%A9non_map
+      // p1: parameter a (typically 1.4), p2: parameter b (typically 0.3)
       case 'henon':
-        // Hénon Map
         const a = p1;
         const b = p2;
         const state_henon = chaosStateRef.henon;
@@ -348,8 +410,12 @@ const MathArtGallery = () => {
         y = canvasHeight / 2 + actualScale * state_henon.y * 200;
         break;
 
+      // Mandelbrot Set Boundary Walker - Traces edge of famous fractal
+      // Iteration: z(n+1) = z(n)² + c, where z and c are complex numbers
+      // Discovered by Benoit Mandelbrot (1980), though investigated earlier
+      // Reference: https://en.wikipedia.org/wiki/Mandelbrot_set
+      // p1: frequency for c_real, p2: frequency for c_imag
       case 'mandelbrot':
-        // Mandelbrot boundary walker
         const mandel_state = chaosStateRef.mandelbrot;
         const c_real = -0.75 + 0.1 * Math.cos(theta * p1);
         const c_imag = 0.1 * Math.sin(theta * p2);
@@ -360,8 +426,8 @@ const MathArtGallery = () => {
         mandel_state.real = z_real * z_real - z_imag * z_imag + c_real;
         mandel_state.imag = 2 * z_real * z_imag + c_imag;
 
-        // Reset if magnitude gets too large
-        if (mandel_state.real * mandel_state.real + mandel_state.imag * mandel_state.imag > 4) {
+        // Reset if magnitude gets too large (escape radius squared)
+        if (mandel_state.real * mandel_state.real + mandel_state.imag * mandel_state.imag > MANDELBROT_ESCAPE_RADIUS_SQUARED) {
           mandel_state.real = 0;
           mandel_state.imag = 0;
         }
@@ -370,8 +436,12 @@ const MathArtGallery = () => {
         y = canvasHeight / 2 + actualScale * mandel_state.imag * 150;
         break;
 
+      // Julia Set - Fractal related to Mandelbrot set with fixed c parameter
+      // Formula: z(n+1) = z(n)² + c (same as Mandelbrot, but c is constant)
+      // Studied by Gaston Julia and Pierre Fatou (1917-1918)
+      // Reference: https://en.wikipedia.org/wiki/Julia_set
+      // p1: real part of c, p2: imaginary part of c
       case 'julia':
-        // Julia Set boundary
         const julia_state = chaosStateRef.julia;
         const c_julia_real = p1;
         const c_julia_imag = p2;
@@ -380,7 +450,7 @@ const MathArtGallery = () => {
         julia_state.real = Math.cos(theta);
         julia_state.imag = Math.sin(theta);
 
-        // Iterate a few times
+        // Iterate a few times to trace boundary
         for (let i = 0; i < 3; i++) {
           const temp_real = julia_state.real * julia_state.real - julia_state.imag * julia_state.imag + c_julia_real;
           const temp_imag = 2 * julia_state.real * julia_state.imag + c_julia_imag;
@@ -392,16 +462,18 @@ const MathArtGallery = () => {
         y = canvasHeight / 2 + actualScale * julia_state.imag * 200;
         break;
 
+      // Clifford Attractor - Strange attractor with sinusoidal map
+      // Formula: x(n+1) = sin(a·y) + c·cos(a·x), y(n+1) = sin(b·x) + d·cos(b·y)
+      // Introduced by Clifford Pickover
+      // Reference: http://paulbourke.net/fractals/clifford/
+      // p1: parameter a, p2: parameter b, c and d from constants
       case 'clifford':
-        // Clifford Attractor
         const cliff_state = chaosStateRef.clifford;
         const a_cliff = p1;
         const b_cliff = p2;
-        const c_cliff = -1.0;
-        const d_cliff = 0.75;
 
-        const newX_cliff = Math.sin(a_cliff * cliff_state.y) + c_cliff * Math.cos(a_cliff * cliff_state.x);
-        const newY_cliff = Math.sin(b_cliff * cliff_state.x) + d_cliff * Math.cos(b_cliff * cliff_state.y);
+        const newX_cliff = Math.sin(a_cliff * cliff_state.y) + CLIFFORD_C * Math.cos(a_cliff * cliff_state.x);
+        const newY_cliff = Math.sin(b_cliff * cliff_state.x) + CLIFFORD_D * Math.cos(b_cliff * cliff_state.y);
 
         cliff_state.x = newX_cliff;
         cliff_state.y = newY_cliff;
@@ -825,15 +897,44 @@ const MathArtGallery = () => {
     if (configParam) {
       try {
         const config = JSON.parse(atob(configParam));
-        setSelectedFormula(config.f || 'euler');
-        setSpeed(config.s || 0.015);
-        setScale(config.sc || 0.38);
-        setParam1(config.p1 || 1);
-        setParam2(config.p2 || Math.PI);
-        setTrailLength(config.t || 400);
-        setColorMode(config.c || 'rainbow');
+
+        // Validate and sanitize configuration
+        const validFormulas = Object.keys(FORMULAS);
+        const validColorModes = ['rainbow', 'cyan-pink', 'fire', 'blue'];
+
+        // Validate formula (must exist in FORMULAS)
+        const formula = validFormulas.includes(config.f) ? config.f : 'euler';
+
+        // Validate numeric parameters with range checking
+        const speed = typeof config.s === 'number' && config.s >= 0.005 && config.s <= 0.04 ? config.s : 0.015;
+        const scale = typeof config.sc === 'number' && config.sc >= 0.05 && config.sc <= 0.42 ? config.sc : 0.38;
+        const param1 = typeof config.p1 === 'number' && config.p1 >= -10 && config.p1 <= 10 ? config.p1 : 1;
+        const param2 = typeof config.p2 === 'number' && config.p2 >= -10 && config.p2 <= 10 ? config.p2 : Math.PI;
+        const trail = typeof config.t === 'number' && config.t >= 100 && config.t <= TRAIL_MAX_LENGTH ? config.t : 400;
+
+        // Validate color mode (must be one of valid modes)
+        const color = validColorModes.includes(config.c) ? config.c : 'rainbow';
+
+        // Apply validated configuration
+        setSelectedFormula(formula);
+        setSpeed(speed);
+        setScale(scale);
+        setParam1(param1);
+        setParam2(param2);
+        setTrailLength(trail);
+        setColorMode(color);
+
+        // Show success message if any invalid values were corrected
+        const hasInvalidValues = config.f !== formula || config.s !== speed || config.sc !== scale ||
+                                 config.p1 !== param1 || config.p2 !== param2 || config.t !== trail ||
+                                 config.c !== color;
+
+        if (hasInvalidValues) {
+          showToast('⚠ Configuration loaded with corrections', 'warning');
+        }
       } catch (error) {
         console.error('Error loading configuration from URL:', error);
+        showToast('✗ Invalid share URL', 'error');
       }
     }
   };
@@ -971,7 +1072,7 @@ const MathArtGallery = () => {
                 >
                   ⌨️ Shortcuts (?)
                 </button>
-                <div className="text-xs font-mono text-[var(--text-tertiary)]">v0.4.0</div>
+                <div className="text-xs font-mono text-[var(--text-tertiary)]">v1.0.0</div>
               </div>
             </div>
             <div className="text-center">
@@ -985,8 +1086,14 @@ const MathArtGallery = () => {
             {/* Left Sidebar */}
             <div className="w-48 bg-[var(--bg-tertiary)] border-r border-[var(--border-subtle)] p-3 overflow-y-auto space-y-3">
               <div>
-                <label className="text-[var(--text-primary)] block mb-2 font-medium text-xs tracking-wide">Formula</label>
-                <select value={selectedFormula} onChange={(e) => setSelectedFormula(e.target.value)} className="w-full p-2 bg-[var(--bg-secondary)] text-[var(--text-primary)] rounded-lg border border-[var(--border-subtle)] hover:border-[var(--accent-primary)] focus:border-[var(--accent-primary)] focus:outline-none transition-all duration-200 text-xs">
+                <label className="text-[var(--text-primary)] block mb-2 font-medium text-xs tracking-wide" htmlFor="formula-select">Formula</label>
+                <select
+                  id="formula-select"
+                  value={selectedFormula}
+                  onChange={(e) => setSelectedFormula(e.target.value)}
+                  className="w-full p-2 bg-[var(--bg-secondary)] text-[var(--text-primary)] rounded-lg border border-[var(--border-subtle)] hover:border-[var(--accent-primary)] focus:border-[var(--accent-primary)] focus:outline-none transition-all duration-200 text-xs"
+                  aria-label="Select mathematical formula"
+                >
                   {Object.entries(FORMULAS).map(([key, value]) => (
                     <option key={key} value={key}>{value.name}</option>
                   ))}
@@ -995,18 +1102,46 @@ const MathArtGallery = () => {
 
               <div>
                 <div className="flex justify-between items-center mb-1">
-                  <label className="text-[var(--text-primary)] font-medium text-xs tracking-wide">Speed</label>
+                  <label className="text-[var(--text-primary)] font-medium text-xs tracking-wide" htmlFor="speed-slider">Speed</label>
                   <span className="text-[var(--accent-primary)] text-xs font-mono">{speed.toFixed(3)}</span>
                 </div>
-                <input type="range" min="0.005" max="0.04" step="0.001" value={speed} onChange={(e) => setSpeed(parseFloat(e.target.value))} className="w-full" />
+                <input
+                  id="speed-slider"
+                  type="range"
+                  min="0.005"
+                  max="0.04"
+                  step="0.001"
+                  value={speed}
+                  onChange={(e) => setSpeed(parseFloat(e.target.value))}
+                  className="w-full"
+                  aria-label="Animation speed"
+                  aria-valuemin="0.005"
+                  aria-valuemax="0.04"
+                  aria-valuenow={speed}
+                  aria-valuetext={`Speed: ${speed.toFixed(3)}`}
+                />
               </div>
 
               <div>
                 <div className="flex justify-between items-center mb-1">
-                  <label className="text-[var(--text-primary)] font-medium text-xs tracking-wide">Scale</label>
+                  <label className="text-[var(--text-primary)] font-medium text-xs tracking-wide" htmlFor="scale-slider">Scale</label>
                   <span className="text-[var(--accent-primary)] text-xs font-mono">{(scale * 100).toFixed(0)}%</span>
                 </div>
-                <input type="range" min="0.05" max="0.42" step="0.01" value={scale} onChange={(e) => setScale(parseFloat(e.target.value))} className="w-full" />
+                <input
+                  id="scale-slider"
+                  type="range"
+                  min="0.05"
+                  max="0.42"
+                  step="0.01"
+                  value={scale}
+                  onChange={(e) => setScale(parseFloat(e.target.value))}
+                  className="w-full"
+                  aria-label="Pattern scale"
+                  aria-valuemin="0.05"
+                  aria-valuemax="0.42"
+                  aria-valuenow={scale}
+                  aria-valuetext={`Scale: ${(scale * 100).toFixed(0)} percent`}
+                />
               </div>
 
               <div>
@@ -1018,6 +1153,8 @@ const MathArtGallery = () => {
                       ? 'bg-gradient-to-r from-[var(--accent-primary)] to-[var(--accent-secondary)] text-white ring-2 ring-[var(--accent-primary)]'
                       : 'bg-[var(--bg-secondary)] text-[var(--text-primary)] border border-[var(--border-subtle)] hover:border-[var(--accent-primary)]'
                   }`}
+                  aria-label={`Toggle particle effects, currently ${particleMode ? 'on' : 'off'}`}
+                  aria-pressed={particleMode}
                 >
                   ✨ Particles {particleMode ? 'ON' : 'OFF'}
                 </button>
@@ -1026,6 +1163,8 @@ const MathArtGallery = () => {
                   <button
                     onClick={() => setIsPlaying(!isPlaying)}
                     className="flex-1 py-2 px-3 rounded-lg font-medium text-xs btn-hover transition-all duration-200 bg-[var(--bg-secondary)] text-[var(--text-primary)] border border-[var(--border-subtle)] hover:border-[var(--accent-primary)]"
+                    aria-label={isPlaying ? 'Pause animation' : 'Play animation'}
+                    aria-pressed={isPlaying}
                   >
                     {isPlaying ? '⏸️ Pause' : '▶️ Play'}
                   </button>
@@ -1038,6 +1177,7 @@ const MathArtGallery = () => {
                       }
                     }}
                     className="flex-1 py-2 px-3 rounded-lg font-medium text-xs btn-hover transition-all duration-200 bg-[var(--bg-secondary)] text-[var(--text-primary)] border border-[var(--border-subtle)] hover:border-[var(--accent-primary)]"
+                    aria-label="Clear canvas"
                   >
                     🗑️ Clear
                   </button>
@@ -1046,20 +1186,35 @@ const MathArtGallery = () => {
 
               <div>
                 <div className="flex justify-between items-center mb-1">
-                  <label className="text-[var(--text-primary)] font-medium text-xs tracking-wide">{getParam1Label()}</label>
+                  <label className="text-[var(--text-primary)] font-medium text-xs tracking-wide" htmlFor="param1-slider">{getParam1Label()}</label>
                   <span className="text-[var(--accent-primary)] text-xs font-mono">{param1.toFixed(1)}</span>
                 </div>
-                <input type="range" min="0.5" max="10" step="0.5" value={param1} onChange={(e) => setParam1(parseFloat(e.target.value))} className="w-full" />
+                <input
+                  id="param1-slider"
+                  type="range"
+                  min="0.5"
+                  max="10"
+                  step="0.5"
+                  value={param1}
+                  onChange={(e) => setParam1(parseFloat(e.target.value))}
+                  className="w-full"
+                  aria-label={`Formula parameter 1: ${getParam1Label()}`}
+                  aria-valuemin="0.5"
+                  aria-valuemax="10"
+                  aria-valuenow={param1}
+                  aria-valuetext={`${getParam1Label()}: ${param1.toFixed(1)}`}
+                />
               </div>
 
               <div>
                 <label className="text-[var(--text-primary)] block mb-2 font-medium text-xs tracking-wide">🎨 Presets</label>
-                <div className="grid grid-cols-1 gap-1 max-h-40 overflow-y-auto">
+                <div className="grid grid-cols-1 gap-1 max-h-40 overflow-y-auto" role="list" aria-label="Preset configurations">
                   {PRESETS.slice(0, 5).map((preset, index) => (
                     <button
                       key={index}
                       onClick={() => loadPreset(preset)}
                       className="py-2 px-2 rounded-lg font-medium text-xs bg-[var(--bg-secondary)] hover:bg-[var(--accent-primary)] hover:bg-opacity-20 text-[var(--text-primary)] transition-all duration-200 text-left border border-[var(--border-subtle)] btn-hover"
+                      aria-label={`Load preset: ${preset.name}`}
                     >
                       {preset.name}
                     </button>
@@ -1089,13 +1244,16 @@ const MathArtGallery = () => {
                   maxHeight: '100%',
                   objectFit: 'contain'
                 }}
+                aria-label={`Mathematical art visualization of ${formula.name}`}
+                role="img"
               />
               {!isFullscreen && (
                 <button
                   onClick={() => setIsFullscreen(true)}
                   className="absolute top-4 right-4 glass hover:bg-[var(--accent-primary)] hover:bg-opacity-20 text-[var(--text-primary)] p-2 rounded-lg btn-hover group transition-all duration-300"
+                  aria-label="Enter fullscreen mode"
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="group-hover:stroke-[var(--accent-primary)]">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="group-hover:stroke-[var(--accent-primary)]" aria-hidden="true">
                     <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a 2 2 0 0 0-2-2h-3m0 18h3a 2 2 0 0 0 2-2v-3M3 16v3a 2 2 0 0 0 2 2h3"/>
                   </svg>
                 </button>
@@ -1106,38 +1264,99 @@ const MathArtGallery = () => {
             <div className="w-48 bg-[var(--bg-tertiary)] border-l border-[var(--border-subtle)] p-3 overflow-y-auto space-y-3">
               <div>
                 <div className="flex justify-between items-center mb-1">
-                  <label className="text-[var(--text-primary)] font-medium text-xs tracking-wide">Trail</label>
+                  <label className="text-[var(--text-primary)] font-medium text-xs tracking-wide" htmlFor="trail-slider">Trail</label>
                   <span className="text-[var(--accent-primary)] text-xs font-mono">{trailLength}</span>
                 </div>
-                <input type="range" min="100" max="1000" step="50" value={trailLength} onChange={(e) => setTrailLength(parseInt(e.target.value))} className="w-full" />
+                <input
+                  id="trail-slider"
+                  type="range"
+                  min="100"
+                  max={TRAIL_MAX_LENGTH}
+                  step="50"
+                  value={trailLength}
+                  onChange={(e) => setTrailLength(parseInt(e.target.value))}
+                  className="w-full"
+                  aria-label="Trail length"
+                  aria-valuemin="100"
+                  aria-valuemax={TRAIL_MAX_LENGTH}
+                  aria-valuenow={trailLength}
+                  aria-valuetext={`Trail length: ${trailLength} points`}
+                />
               </div>
 
               <div>
                 <div className="flex justify-between items-center mb-1">
-                  <label className="text-[var(--text-primary)] font-medium text-xs tracking-wide">{getParam2Label()}</label>
+                  <label className="text-[var(--text-primary)] font-medium text-xs tracking-wide" htmlFor="param2-slider">{getParam2Label()}</label>
                   <span className="text-[var(--accent-primary)] text-xs font-mono">{param2.toFixed(1)}</span>
                 </div>
-                <input type="range" min="0.5" max="10" step="0.5" value={param2} onChange={(e) => setParam2(parseFloat(e.target.value))} className="w-full" />
+                <input
+                  id="param2-slider"
+                  type="range"
+                  min="0.5"
+                  max="10"
+                  step="0.5"
+                  value={param2}
+                  onChange={(e) => setParam2(parseFloat(e.target.value))}
+                  className="w-full"
+                  aria-label={`Formula parameter 2: ${getParam2Label()}`}
+                  aria-valuemin="0.5"
+                  aria-valuemax="10"
+                  aria-valuenow={param2}
+                  aria-valuetext={`${getParam2Label()}: ${param2.toFixed(1)}`}
+                />
               </div>
 
               <div>
                 <label className="text-[var(--text-primary)] block mb-2 font-medium text-xs tracking-wide">Color Mode</label>
-                <div className="grid grid-cols-1 gap-2">
-                  <button onClick={() => setColorMode('rainbow')} className={`py-2 px-3 rounded-lg font-medium text-xs btn-hover transition-all duration-200 ${colorMode === 'rainbow' ? 'bg-gradient-to-r from-red-500 via-yellow-500 to-blue-500 ring-2 ring-[var(--accent-primary)] text-white' : 'bg-[var(--bg-secondary)] text-[var(--text-primary)] border border-[var(--border-subtle)] hover:border-[var(--accent-primary)]'}`}>Rainbow</button>
-                  <button onClick={() => setColorMode('cyan-pink')} className={`py-2 px-3 rounded-lg font-medium text-xs btn-hover transition-all duration-200 ${colorMode === 'cyan-pink' ? 'bg-gradient-to-r from-cyan-500 to-pink-500 ring-2 ring-[var(--accent-primary)] text-white' : 'bg-[var(--bg-secondary)] text-[var(--text-primary)] border border-[var(--border-subtle)] hover:border-[var(--accent-primary)]'}`}>Neon</button>
-                  <button onClick={() => setColorMode('fire')} className={`py-2 px-3 rounded-lg font-medium text-xs btn-hover transition-all duration-200 ${colorMode === 'fire' ? 'bg-gradient-to-r from-yellow-500 to-red-600 ring-2 ring-[var(--accent-primary)] text-white' : 'bg-[var(--bg-secondary)] text-[var(--text-primary)] border border-[var(--border-subtle)] hover:border-[var(--accent-primary)]'}`}>Fire</button>
-                  <button onClick={() => setColorMode('blue')} className={`py-2 px-3 rounded-lg font-medium text-xs btn-hover transition-all duration-200 ${colorMode === 'blue' ? 'bg-blue-500 ring-2 ring-[var(--accent-primary)] text-white' : 'bg-[var(--bg-secondary)] text-[var(--text-primary)] border border-[var(--border-subtle)] hover:border-[var(--accent-primary)]'}`}>Blue</button>
+                <div className="grid grid-cols-1 gap-2" role="radiogroup" aria-label="Color mode selection">
+                  <button
+                    onClick={() => setColorMode('rainbow')}
+                    className={`py-2 px-3 rounded-lg font-medium text-xs btn-hover transition-all duration-200 ${colorMode === 'rainbow' ? 'bg-gradient-to-r from-red-500 via-yellow-500 to-blue-500 ring-2 ring-[var(--accent-primary)] text-white' : 'bg-[var(--bg-secondary)] text-[var(--text-primary)] border border-[var(--border-subtle)] hover:border-[var(--accent-primary)]'}`}
+                    role="radio"
+                    aria-checked={colorMode === 'rainbow'}
+                    aria-label="Rainbow color mode"
+                  >
+                    Rainbow
+                  </button>
+                  <button
+                    onClick={() => setColorMode('cyan-pink')}
+                    className={`py-2 px-3 rounded-lg font-medium text-xs btn-hover transition-all duration-200 ${colorMode === 'cyan-pink' ? 'bg-gradient-to-r from-cyan-500 to-pink-500 ring-2 ring-[var(--accent-primary)] text-white' : 'bg-[var(--bg-secondary)] text-[var(--text-primary)] border border-[var(--border-subtle)] hover:border-[var(--accent-primary)]'}`}
+                    role="radio"
+                    aria-checked={colorMode === 'cyan-pink'}
+                    aria-label="Neon (cyan-pink) color mode"
+                  >
+                    Neon
+                  </button>
+                  <button
+                    onClick={() => setColorMode('fire')}
+                    className={`py-2 px-3 rounded-lg font-medium text-xs btn-hover transition-all duration-200 ${colorMode === 'fire' ? 'bg-gradient-to-r from-yellow-500 to-red-600 ring-2 ring-[var(--accent-primary)] text-white' : 'bg-[var(--bg-secondary)] text-[var(--text-primary)] border border-[var(--border-subtle)] hover:border-[var(--accent-primary)]'}`}
+                    role="radio"
+                    aria-checked={colorMode === 'fire'}
+                    aria-label="Fire (yellow-red) color mode"
+                  >
+                    Fire
+                  </button>
+                  <button
+                    onClick={() => setColorMode('blue')}
+                    className={`py-2 px-3 rounded-lg font-medium text-xs btn-hover transition-all duration-200 ${colorMode === 'blue' ? 'bg-blue-500 ring-2 ring-[var(--accent-primary)] text-white' : 'bg-[var(--bg-secondary)] text-[var(--text-primary)] border border-[var(--border-subtle)] hover:border-[var(--accent-primary)]'}`}
+                    role="radio"
+                    aria-checked={colorMode === 'blue'}
+                    aria-label="Blue color mode"
+                  >
+                    Blue
+                  </button>
                 </div>
               </div>
 
               <div>
                 <label className="text-[var(--text-primary)] block mb-2 font-medium text-xs tracking-wide">More Presets</label>
-                <div className="grid grid-cols-1 gap-1 max-h-40 overflow-y-auto">
+                <div className="grid grid-cols-1 gap-1 max-h-40 overflow-y-auto" role="list" aria-label="Additional preset configurations">
                   {PRESETS.slice(5).map((preset, index) => (
                     <button
                       key={index}
                       onClick={() => loadPreset(preset)}
                       className="py-2 px-2 rounded-lg font-medium text-xs bg-[var(--bg-secondary)] hover:bg-[var(--accent-primary)] hover:bg-opacity-20 text-[var(--text-primary)] transition-all duration-200 text-left border border-[var(--border-subtle)] btn-hover"
+                      aria-label={`Load preset: ${preset.name}`}
                     >
                       {preset.name}
                     </button>
@@ -1211,7 +1430,6 @@ const MathArtGallery = () => {
             </div>
           </div>
         </div>
-      )}
 
       {/* Toast Notification */}
       {toast.show && (
