@@ -88,6 +88,21 @@ const PRESETS = [
     name: "🎭 Clifford Attractor",
     formula: "clifford",
     params: { speed: 0.025, scale: 0.12, param1: -1.4, param2: 1.6, trail: 2500, colorMode: "fire" }
+  },
+  {
+    name: "🌊 Wave Interference",
+    formula: "interference",
+    params: { speed: 0.010, scale: 0.30, param1: 28, param2: 12, trail: 800, colorMode: "cyan-pink" }
+  },
+  {
+    name: "💫 Quantum Ripples",
+    formula: "interference",
+    params: { speed: 0.008, scale: 0.35, param1: 24, param2: 8, trail: 1000, colorMode: "rainbow" }
+  },
+  {
+    name: "✨ Holographic Field",
+    formula: "interference",
+    params: { speed: 0.012, scale: 0.25, param1: 32, param2: 16, trail: 600, colorMode: "fire" }
   }
 ];
 
@@ -175,6 +190,12 @@ const FORMULAS = {
     formula: "Strange attractor",
     description: "Chaotic point mapping",
     defaultParams: { speed: 0.025, scale: 0.12, param1: -1.4, param2: 1.6, trail: 2500 }
+  },
+  interference: {
+    name: "Wave Interference",
+    formula: "I(r) = |Σ A·e^(i(k·r + φᵢ))|²",
+    description: "Multi-wave interference pattern",
+    defaultParams: { speed: 0.010, scale: 0.30, param1: 28, param2: 12, trail: 800 }
   }
 };
 
@@ -482,6 +503,60 @@ const MathArtGallery = () => {
         y = canvasHeight / 2 + actualScale * cliff_state.y * 250;
         break;
 
+      // Wave Interference - Multi-wave superposition creating interference patterns
+      // Formula: I(r) = |Σᵢ₌₁ⁿ A·e^(i(k·r + φᵢ))|² where k ∈ [24,32]
+      // Fundamental physics: constructive and destructive interference of plane waves
+      // Reference: https://en.wikipedia.org/wiki/Wave_interference
+      // p1: k-value (wave vector magnitude, controls pattern density)
+      // p2: number of waves (controls symmetry: 6, 8, 12, 16-fold)
+      case 'interference':
+        const numWaves = Math.max(2, Math.min(32, Math.floor(p2))); // Clamp between 2-32 waves
+        const k = p1; // Wave vector magnitude (frequency)
+        const amplitude = 1.0;
+
+        // Create a spiral trace pattern
+        const radius_theta = theta * 0.05; // Slowly expanding radius
+        const angle_theta = theta; // Rotation angle
+
+        // Position vector in 2D space (relative to center)
+        const pos_x = radius_theta * Math.cos(angle_theta);
+        const pos_y = radius_theta * Math.sin(angle_theta);
+
+        // Sum all wave contributions using complex exponentials
+        let realSum = 0;
+        let imagSum = 0;
+
+        for (let i = 0; i < numWaves; i++) {
+          // Each wave propagates in a different direction (evenly spaced around circle)
+          const waveAngle = (2 * Math.PI * i) / numWaves;
+          const waveDir_x = Math.cos(waveAngle);
+          const waveDir_y = Math.sin(waveAngle);
+
+          // Dot product k·r (determines wave phase at this position)
+          const kDotR = k * (waveDir_x * pos_x + waveDir_y * pos_y);
+
+          // Phase offset (animated to create flowing patterns)
+          const phaseOffset = theta * 0.02;
+
+          // Complex exponential: e^(i(k·r + φ)) = cos(phase) + i·sin(phase)
+          const phase = kDotR + phaseOffset;
+          realSum += amplitude * Math.cos(phase);
+          imagSum += amplitude * Math.sin(phase);
+        }
+
+        // Intensity: I = |sum|² = real² + imag²
+        const intensity = realSum * realSum + imagSum * imagSum;
+
+        // Normalize intensity (maximum is numWaves²)
+        const normalizedIntensity = intensity / (numWaves * numWaves);
+
+        // Map intensity to visual position (creates expanding/contracting pattern)
+        const visualRadius = actualScale * (1 + normalizedIntensity * 0.5);
+
+        x = canvasWidth / 2 + visualRadius * Math.cos(angle_theta);
+        y = canvasHeight / 2 + visualRadius * Math.sin(angle_theta);
+        break;
+
       default:
         x = canvasWidth / 2;
         y = canvasHeight / 2;
@@ -786,6 +861,7 @@ const MathArtGallery = () => {
       case 'mandelbrot': return 'Real Mod';
       case 'julia': return 'Real Part';
       case 'clifford': return 'Parameter a';
+      case 'interference': return 'Wave k-value';
       default: return 'Outer Radius';
     }
   };
@@ -800,6 +876,7 @@ const MathArtGallery = () => {
       case 'mandelbrot': return 'Imag Mod';
       case 'julia': return 'Imag Part';
       case 'clifford': return 'Parameter b';
+      case 'interference': return 'Wave Count';
       default: return 'Rolling Radius';
     }
   };
@@ -1072,7 +1149,7 @@ const MathArtGallery = () => {
                 >
                   ⌨️ Shortcuts (?)
                 </button>
-                <div className="text-xs font-mono text-[var(--text-tertiary)]">v1.0.0</div>
+                <div className="text-xs font-mono text-[var(--text-tertiary)]">v1.1.0</div>
               </div>
             </div>
             <div className="text-center">
